@@ -39,7 +39,7 @@ button{ margin-left:10px; padding:6px 12px; }
 
 .grid {
   display:grid;
-  grid-template-columns:repeat(4,1fr);
+  grid-template-columns:1fr 1fr 60px 1fr 1fr; /* větší mezera uprostřed */
   gap:25px;
 }
 
@@ -68,6 +68,8 @@ button{ margin-left:10px; padding:6px 12px; }
   color:#bbb;
   cursor:pointer;
 }
+
+.spacer { }
 
 .quote {
   position:absolute;
@@ -107,12 +109,12 @@ Datum: <input id="dateInput" type="text" value="Listopad 2025 - Duben 2026">
   <div class="date" id="dateText">Datum: Listopad 2025 - Duben 2026</div>
 
   <div class="block">
-    <div class="labels"><div>Před</div><div>Po</div><div>Před</div><div>Po</div></div>
+    <div class="labels"><div>Před</div><div>Po</div><div></div><div>Před</div><div>Po</div></div>
     <div class="grid" id="grid1"></div>
   </div>
 
   <div class="block">
-    <div class="labels"><div>Před</div><div>Po</div><div>Před</div><div>Po</div></div>
+    <div class="labels"><div>Před</div><div>Po</div><div></div><div>Před</div><div>Po</div></div>
     <div class="grid" id="grid2"></div>
   </div>
 
@@ -156,6 +158,7 @@ function createSlot(){
     r.readAsDataURL(file);
   };
 
+  // zoom
   slot.addEventListener("wheel", e=>{
     if(!img) return;
     e.preventDefault();
@@ -164,6 +167,7 @@ function createSlot(){
     update();
   });
 
+  // PC drag
   slot.addEventListener("mousedown", e=>{
     if(!img) return;
     dragging=true;
@@ -180,6 +184,25 @@ function createSlot(){
 
   document.addEventListener("mouseup", ()=> dragging=false);
 
+  // mobil drag
+  slot.addEventListener("touchstart", e=>{
+    if(!img) return;
+    dragging=true;
+    const t=e.touches[0];
+    startX=t.clientX - x;
+    startY=t.clientY - y;
+  });
+
+  slot.addEventListener("touchmove", e=>{
+    if(!dragging) return;
+    const t=e.touches[0];
+    x=t.clientX - startX;
+    y=t.clientY - startY;
+    update();
+  });
+
+  slot.addEventListener("touchend", ()=> dragging=false);
+
   function update(){
     if(!img) return;
     img.style.transform=`translate(${x}px,${y}px) scale(${scale})`;
@@ -188,31 +211,44 @@ function createSlot(){
   return wrap;
 }
 
-for(let i=0;i<4;i++) document.getElementById("grid1").appendChild(createSlot());
-for(let i=0;i<4;i++) document.getElementById("grid2").appendChild(createSlot());
+// layout s mezerou
+function fillGrid(containerId){
+  const g=document.getElementById(containerId);
+  g.appendChild(createSlot());
+  g.appendChild(createSlot());
+  g.appendChild(document.createElement("div")); // spacer
+  g.appendChild(createSlot());
+  g.appendChild(createSlot());
+}
 
+fillGrid("grid1");
+fillGrid("grid2");
+
+// datum
 const dateInput=document.getElementById("dateInput");
 const dateText=document.getElementById("dateText");
 dateInput.oninput=()=> dateText.textContent="Datum: "+dateInput.value;
 
-// ✅ export funguje i na mobilu
+// export FIX
 
-document.getElementById("exportBtn").addEventListener("click", async ()=>{
-  const canvas = await html2canvas(document.querySelector("#a4"), {scale:3});
+document.getElementById("exportBtn").onclick = async ()=>{
+  const element = document.getElementById("a4");
 
-  canvas.toBlob(function(blob){
-    const url = URL.createObjectURL(blob);
+  try{
+    const canvas = await html2canvas(element, { scale:3 });
+    const dataUrl = canvas.toDataURL("image/png");
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "vystup.png";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    URL.revokeObjectURL(url);
-  }, "image/png");
-});
+    const link = document.createElement("a");
+    link.download = "vystup.png";
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }catch(e){
+    alert("Export nefunguje – zkus otevřít soubor přes prohlížeč (ne přes file://)");
+    console.error(e);
+  }
+};
 </script>
 
 </body>
