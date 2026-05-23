@@ -148,7 +148,6 @@ function createSlot(){
     r.readAsDataURL(file);
   };
 
-  // mouse zoom
   slot.addEventListener("wheel", e=>{
     if(!img) return;
     e.preventDefault();
@@ -157,7 +156,6 @@ function createSlot(){
     update();
   });
 
-  // mouse drag
   slot.addEventListener("mousedown", e=>{
     dragging=true;
     startX=e.clientX-x;
@@ -173,7 +171,6 @@ function createSlot(){
 
   document.addEventListener("mouseup", ()=> dragging=false);
 
-  // touch drag + pinch
   slot.addEventListener("touchstart", e=>{
     if(e.touches.length===1){
       dragging=true;
@@ -240,24 +237,34 @@ const dateInput=document.getElementById("dateInput");
 const dateText=document.getElementById("dateText");
 dateInput.oninput=()=> dateText.textContent="Datum: "+dateInput.value;
 
-// export
+// ✅ EXPORT (správně pro PC + mobil)
 
 document.getElementById("exportBtn").onclick = async ()=>{
-  try{
-    const canvas = await html2canvas(document.getElementById("a4"), {
-      scale:3,
-      useCORS:true
-    });
+  const canvas = await html2canvas(document.getElementById("a4"), {
+    scale:3,
+    useCORS:true
+  });
 
-    const link = document.createElement("a");
-    link.download = "vystup.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+  canvas.toBlob(async (blob)=>{
 
-  }catch(e){
-    alert("Export selhal – pravděpodobně kvůli hostingu nebo cache. Zkus stránku reloadnout (Ctrl+F5).");
-    console.error(e);
-  }
+    // ✅ mobil (iPhone/Android) → otevře sdílení → uložit do fotek
+    if(navigator.canShare && navigator.canShare({ files: [new File([blob], "vystup.png", {type:"image/png"})] })){
+      const file = new File([blob], "vystup.png", { type:"image/png" });
+      await navigator.share({ files:[file], title:"Obrázek" });
+      return;
+    }
+
+    // ✅ PC → otevře dialog (uložit kam chceš)
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "vystup.png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+  }, "image/png");
 };
 </script>
 
