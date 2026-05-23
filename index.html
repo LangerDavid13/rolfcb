@@ -20,27 +20,21 @@ button{ margin-left:10px; padding:6px 12px; }
   color:#7c5a2b;
 }
 
-.logo {
-  display:block;
-  margin:0 auto;
-  width:300px;
+.logo { display:block; margin:0 auto; width:300px; }
+.date { text-align:center; margin:15px 0 35px; font-size:20px; }
+
+.block { margin-top:30px; }
+
+.row {
+  display:grid;
+  grid-template-columns:1fr 1fr 80px 1fr 1fr;
+  gap:25px;
 }
 
-.date { text-align:center; margin:15px 0 25px; font-size:20px; }
-
-.block { margin-top:20px; }
-.labels {
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
+.label {
   text-align:center;
   font-size:20px;
   margin-bottom:5px;
-}
-
-.grid {
-  display:grid;
-  grid-template-columns:1fr 1fr 60px 1fr 1fr; /* větší mezera uprostřed */
-  gap:25px;
 }
 
 .slot {
@@ -68,8 +62,6 @@ button{ margin-left:10px; padding:6px 12px; }
   color:#bbb;
   cursor:pointer;
 }
-
-.spacer { }
 
 .quote {
   position:absolute;
@@ -105,18 +97,10 @@ Datum: <input id="dateInput" type="text" value="Listopad 2025 - Duben 2026">
 
 <div id="a4">
   <img src="logo.png" class="logo" />
-
   <div class="date" id="dateText">Datum: Listopad 2025 - Duben 2026</div>
 
-  <div class="block">
-    <div class="labels"><div>Před</div><div>Po</div><div></div><div>Před</div><div>Po</div></div>
-    <div class="grid" id="grid1"></div>
-  </div>
-
-  <div class="block">
-    <div class="labels"><div>Před</div><div>Po</div><div></div><div>Před</div><div>Po</div></div>
-    <div class="grid" id="grid2"></div>
-  </div>
+  <div class="block" id="grid1"></div>
+  <div class="block" id="grid2"></div>
 
   <div class="quote">Tělo je sítí vztahů, struktura určuje funkci.</div>
   <div class="ida">- Ida Rolf -</div>
@@ -126,6 +110,10 @@ Datum: <input id="dateInput" type="text" value="Listopad 2025 - Duben 2026">
 <script>
 function createSlot(){
   const wrap=document.createElement("div");
+
+  const label=document.createElement("div");
+  label.className="label";
+
   const slot=document.createElement("div");
   slot.className="slot";
 
@@ -138,11 +126,13 @@ function createSlot(){
   input.accept="image/*";
 
   slot.appendChild(plus);
+  wrap.appendChild(label);
   wrap.appendChild(slot);
   wrap.appendChild(input);
 
   let img=null, scale=1, x=0, y=0;
   let dragging=false, startX=0, startY=0;
+  let lastDist=null;
 
   plus.onclick=()=> input.click();
 
@@ -158,94 +148,114 @@ function createSlot(){
     r.readAsDataURL(file);
   };
 
-  // zoom
+  // mouse zoom
   slot.addEventListener("wheel", e=>{
     if(!img) return;
     e.preventDefault();
     scale+=e.deltaY*-0.001;
-    scale=Math.min(Math.max(0.2,scale),5);
+    scale=Math.max(0.2, Math.min(scale,5));
     update();
   });
 
-  // PC drag
+  // mouse drag
   slot.addEventListener("mousedown", e=>{
-    if(!img) return;
     dragging=true;
-    startX=e.clientX - x;
-    startY=e.clientY - y;
+    startX=e.clientX-x;
+    startY=e.clientY-y;
   });
 
   document.addEventListener("mousemove", e=>{
     if(!dragging) return;
-    x=e.clientX - startX;
-    y=e.clientY - startY;
+    x=e.clientX-startX;
+    y=e.clientY-startY;
     update();
   });
 
   document.addEventListener("mouseup", ()=> dragging=false);
 
-  // mobil drag
+  // touch drag + pinch
   slot.addEventListener("touchstart", e=>{
-    if(!img) return;
-    dragging=true;
-    const t=e.touches[0];
-    startX=t.clientX - x;
-    startY=t.clientY - y;
+    if(e.touches.length===1){
+      dragging=true;
+      startX=e.touches[0].clientX-x;
+      startY=e.touches[0].clientY-y;
+    }
+    if(e.touches.length===2){
+      lastDist = distance(e.touches[0], e.touches[1]);
+    }
   });
 
   slot.addEventListener("touchmove", e=>{
-    if(!dragging) return;
-    const t=e.touches[0];
-    x=t.clientX - startX;
-    y=t.clientY - startY;
-    update();
+    e.preventDefault();
+    if(e.touches.length===1 && dragging){
+      x=e.touches[0].clientX-startX;
+      y=e.touches[0].clientY-startY;
+      update();
+    }
+    if(e.touches.length===2){
+      const dist = distance(e.touches[0], e.touches[1]);
+      if(lastDist){
+        scale += (dist-lastDist)*0.005;
+        scale=Math.max(0.2, Math.min(scale,5));
+        update();
+      }
+      lastDist=dist;
+    }
+  }, {passive:false});
+
+  slot.addEventListener("touchend", ()=>{
+    dragging=false;
+    lastDist=null;
   });
 
-  slot.addEventListener("touchend", ()=> dragging=false);
-
-  function update(){
-    if(!img) return;
-    img.style.transform=`translate(${x}px,${y}px) scale(${scale})`;
+  function distance(a,b){
+    return Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
   }
 
-  return wrap;
+  function update(){
+    if(img) img.style.transform=`translate(${x}px,${y}px) scale(${scale})`;
+  }
+
+  return {wrap,label};
 }
 
-// layout s mezerou
-function fillGrid(containerId){
-  const g=document.getElementById(containerId);
-  g.appendChild(createSlot());
-  g.appendChild(createSlot());
-  g.appendChild(document.createElement("div")); // spacer
-  g.appendChild(createSlot());
-  g.appendChild(createSlot());
+function createRow(container){
+  const row=document.createElement("div");
+  row.className="row";
+
+  const s1=createSlot(); s1.label.textContent="Před";
+  const s2=createSlot(); s2.label.textContent="Po";
+  const spacer=document.createElement("div");
+  const s3=createSlot(); s3.label.textContent="Před";
+  const s4=createSlot(); s4.label.textContent="Po";
+
+  row.append(s1.wrap, s2.wrap, spacer, s3.wrap, s4.wrap);
+  container.appendChild(row);
 }
 
-fillGrid("grid1");
-fillGrid("grid2");
+createRow(document.getElementById("grid1"));
+createRow(document.getElementById("grid2"));
 
-// datum
 const dateInput=document.getElementById("dateInput");
 const dateText=document.getElementById("dateText");
 dateInput.oninput=()=> dateText.textContent="Datum: "+dateInput.value;
 
-// export FIX
+// export
 
 document.getElementById("exportBtn").onclick = async ()=>{
-  const element = document.getElementById("a4");
-
   try{
-    const canvas = await html2canvas(element, { scale:3 });
-    const dataUrl = canvas.toDataURL("image/png");
+    const canvas = await html2canvas(document.getElementById("a4"), {
+      scale:3,
+      useCORS:true
+    });
 
     const link = document.createElement("a");
     link.download = "vystup.png";
-    link.href = dataUrl;
-    document.body.appendChild(link);
+    link.href = canvas.toDataURL("image/png");
     link.click();
-    document.body.removeChild(link);
+
   }catch(e){
-    alert("Export nefunguje – zkus otevřít soubor přes prohlížeč (ne přes file://)");
+    alert("Export selhal – pravděpodobně kvůli hostingu nebo cache. Zkus stránku reloadnout (Ctrl+F5).");
     console.error(e);
   }
 };
